@@ -12,65 +12,14 @@
 #include <openssl/err.h>
 #include <netdb.h>
 
-#define DTLS_PORT 8880
+#define DTLS_PORT 8888
 #define BUFFER_SIZE 1024
-
-typedef struct
-{
-    SSL_CTX *ctx;
-    char buf[BUFFER_SIZE];
-} dtls_data;
 
 int main(int argc, char const *argv[])
 {
-    dtls_data data;
-    int server = 0;
-
-    // Initialize the DTLS context and set up the server or client SSL object
-    SSL_library_init();
-
-    // Create the DTLS context
-    data.ctx = SSL_CTX_new(DTLS_client_method());
-    if (data.ctx == NULL)
-    {
-        printf("DTLS context not created\n");
-        return -1;
-    }
-    else
-    {
-        printf("DTLS context created\n");
-    }
-
-    // Create the client SSL object
-    SSL *ssl = NULL;
-    ssl = SSL_new(data.ctx);
-    if (ssl == NULL)
-    {
-        printf("Client SSL object not created\n");
-        return -1;
-    }
-    else
-    {
-        printf("Client SSL object created\n");
-    }
-  
-    // Set the socket to non-blocking
-    // int flags = fcntl(sockfd, F_GETFL, 0);
-    // if (flags < 0)
-    // {
-    //     printf("Could not get socket flags\n");
-    //     return -1;
-    // }
-    // if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
-    // {
-    //     printf("Could not set socket to non-blocking\n");
-    //     return -1;
-    // }
-
+    // Create a UDP socket for the DTLS connection
     struct sockaddr_in servaddr;
     memset(&servaddr, 0, sizeof(servaddr));
-
-    // Thiết lập thông tin địa chỉ của server
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(DTLS_PORT);
     servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -87,8 +36,50 @@ int main(int argc, char const *argv[])
         printf("Socket created\n");
     }
 
+    // int bind_status = bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+    // if (bind_status < 0)
+    // {
+    //     printf("Socket not binded\n");
+    //     return -1;
+    // }
+    // else
+    // {
+    //     printf("Socket binded\n");
+    // }
+
+    // Initialize the DTLS context and set up the server or client SSL object
+    SSL_library_init();
+
+    // Create the DTLS context
+    SSL_CTX *ctx;
+    ctx = SSL_CTX_new(DTLS_client_method());
+    if (ctx == NULL)
+    {
+        printf("DTLS context not created\n");
+        return -1;
+    }
+    else
+    {
+        printf("DTLS context created\n");
+    }
+
+    // Create the client SSL object
+    SSL *ssl = NULL;
+    ssl = SSL_new(ctx);
+    if (ssl == NULL)
+    {
+        printf("Client SSL object not created\n");
+        return -1;
+    }
+    else
+    {
+        printf("Client SSL object created\n");
+    }
+  
+
     // Set the socket to be used by the SSL object
-    if (SSL_set_fd(ssl, sockfd) == 0)
+    int setfd_status = SSL_set_fd(ssl, sockfd);
+    if (setfd_status <= 0)
     {
         printf("Could not set socket to be used by SSL object\n");
         return -1;
@@ -98,9 +89,14 @@ int main(int argc, char const *argv[])
         printf("Socket set to be used by SSL object\n");
     }
 
+    // Set the server address
+    // SSL_set_connect_state(ssl);
+    
     // Connect to the server
-    if (SSL_connect(ssl) == 0)
+    int connect_status = SSL_connect(ssl);
+    if (connect_status <= 0)
     {
+        // printf("%d", connect_status);
         printf("Could not connect to server\n");
         return -1;
     }
@@ -108,8 +104,6 @@ int main(int argc, char const *argv[])
     {
         printf("Connected to server\n");
     }
-
-
 
     // Send a message to the server
     char *msg = "Hello from client";

@@ -11,12 +11,37 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define DTLS_PORT 8880
+#define DTLS_PORT 8888
 #define BUFFER_SIZE 1024
 
 int main(int argc, char *argv[])
 {
-    // Initialize the DTLS context and set up the server or client SSL object
+    // Create a UDP socket for the DTLS connection
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    server_addr.sin_port = htons(DTLS_PORT);
+    
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0)
+    {
+        perror("Error creating socket\n");
+        return 1;
+    } else {
+        printf("Socket created\n");
+    }
+
+    // Bind the socket to a port
+    int bind_status = bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    if (bind_status < 0){
+        perror("Error binding socket");
+        return 1;
+    } else {
+        printf("Socket binded\n");
+    }
+
+  // Initialize the DTLS context and set up the server or client SSL object
     SSL_library_init();
     int server = 1;
     // Create the DTLS context
@@ -40,46 +65,6 @@ int main(int argc, char *argv[])
         printf("Server SSL object created\n");
     }
 
-    // Create a UDP socket for the DTLS connection
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0)
-    {
-        perror("Error creating socket\n");
-        return 1;
-    } else {
-        printf("Socket created\n");
-    }
-
-    // Bind the socket to a port
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(DTLS_PORT);
-    
-    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
-    {
-        perror("Error binding socket");
-        return 1;
-    } else {
-        printf("Socket binded\n");
-    }
-
-    // Set the socket as non-blocking
-    // int flags = 1;
-    // flags = ioctl(sockfd, FIONBIO, 0);
-    // fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
-
-    // printf("....................");
-
-    if (ssl == NULL)
-    {
-        printf("SSL object not created\n");
-        return -1;
-    } else {
-        printf("SSL object created\n");
-    }
-    
     // Set the SSL object to use the socket for the DTLS connection
     if (!SSL_set_fd(ssl, sockfd)) 
     {
@@ -88,16 +73,10 @@ int main(int argc, char *argv[])
     } else {
         printf("Socket set for SSL object\n");
     }
-    
-    // printf("....................");
 
-    // Set up the DTLS cookie generator
-    // SSL_CTX_set_cookie_generate_cb(data.ctx, generate_cookie);
-    // SSL_CTX_set_cookie_verify_cb(data.ctx, verify_cookie);
-
-    // Wait for incoming DTLS connections
     while (1)
     {
+    // Wait for incoming DTLS connections
         printf("Waiting for connection...\n");
         if(SSL_accept(ssl) == 1) 
         {
@@ -107,6 +86,35 @@ int main(int argc, char *argv[])
         else
         {
             printf("Connection failed\n");
+        }
+        continue;
+        while (1)
+        {
+            // receive msg from client
+            char buffer[BUFFER_SIZE];
+            int bytes_read = SSL_read(ssl, buffer, BUFFER_SIZE);
+            if (bytes_read < 0)
+            {
+                printf("Error reading from socket\n");
+                return -1;
+            }
+            else
+            {
+                printf("Message received: %s\n", buffer);
+            }
+
+            // send msg to client
+            char *msg = "Hello from server";
+            int bytes_sent = SSL_write(ssl, msg, strlen(msg));
+            if (bytes_sent < 0)
+            {
+                printf("Error writing to socket\n");
+                return -1;
+            }
+            else
+            {
+                printf("Message sent: %s\n", msg);
+            }
         }
     }
 
