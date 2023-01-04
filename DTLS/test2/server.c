@@ -51,85 +51,133 @@
 
 int main(int argc, char const *argv[])
 {
-    SSL_load_error_strings(); //readable error messages
-    SSL_library_init(); //initialize the library
-
-    SSL_CTX *ctx;
-
-    // create a new DTLS context
-    ctx = SSL_CTX_new(DTLS_server_method());
-
-    // load certificate and private key
-    SSL_CTX_use_certificate_chain_file(ctx, "cert.pem");
-    SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM);
-
-    // SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, verify_cert); 
-
-    // SSL_CTX_set_cookie_generate_cb(ctx, generate_cookie);
-    // SSL_CTX_set_cookie_verify_cb(ctx, verify_cookie);
-
-    // connection setup
-    /*
-    Server need a socket awaiting for incoming connection
-    Create a new BIO to respond to connection attempt
-    */
-    struct sockaddr_in server_addr;
+    struct sockaddr_in server_addr, client_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
     server_addr.sin_port = htons(DTLS_PORT);
 
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    int server_socket = socket(AF_INET, SOCK_DGRAM, 0);
 
-    bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
-
-    while(1)
-    {
-        BIO_ADDR *client_addr;
-        BIO *bio = BIO_new_dgram(sockfd, BIO_NOCLOSE); // create a new BIO
-        SSL *ssl = SSL_new(ctx); // create a new SSL connection state
-        SSL_set_bio(ssl, bio, bio); // attach the socket to the SSL object
-
-        // enable cookie exchange
-        SSL_set_options(ssl, SSL_OP_COOKIE_EXCHANGE);
-
-        // wait for a client to connect
-        while (!DTLSv1_listen(ssl, client_addr))
-        {
-            // handle client connection
-            int client_fd = socket(AF_INET, SOCK_DGRAM, 0);
-            bind(client_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
-            connect(client_fd, (struct sockaddr *)&client_addr, sizeof(client_addr));
-
-            //set new fd and get BIO to connected
-            BIO *cbio = SSL_get_rbio(ssl);
-            BIO_set_fd(cbio, client_fd, BIO_NOCLOSE);
-            BIO_ctrl(cbio, BIO_CTRL_DGRAM_SET_CONNECTED, 0, &server_addr);
-
-            // finish handshake
-            if (SSL_accept(ssl) <= 0)
-            {
-                ERR_print_errors_fp(stderr);
-                break;
-            } else {
-                printf("Handshake completed\n");
-            }
-
-            // read data from client
-            char buf[BUFSIZE];
-            int len = SSL_read(ssl, buf, BUFSIZE);
-            if (len > 0)
-            {
-                buf[len] = '\0';
-                printf("Received: %s\n", buf);
-            } else {
-                ERR_print_errors_fp(stderr);
-            }
-
-            // write data to client
-            char *msg = "Hello Client";
-            SSL_write(ssl, msg, BUFSIZE);
-        }   
+    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr))){
+        perror("Bind failed");
+        exit(EXIT_FAILURE);
     }
+
+
+    SSL_load_error_strings(); //readable error messages
+    SSL_library_init(); //initialize the library
+
+    const SSL_METHOD *method;
+    SSL_CTX *ctx;
+
+    // create a new DTLS context
+    method = DTLS_server_method();
+    ctx = SSL_CTX_new(method);
+    if (!ctx)
+    {
+        perror("Unable to create SSL context\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // SSL_CTX_set_options(ctx, SSL_);
+
+    // load certificate and private key
+    if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0)
+    {
+        ERR_print_errors_fp(stderr);
+        exit(EXIT_FAILURE);
+    }
+    if (SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM) <= 0)
+    {
+        ERR_print_errors_fp(stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    // verify certificate
+    if (!SSL_CTX_check_private_key(ctx))
+    {
+        fprintf(stderr, "Private key and certificate do not match\n");
+        return 1;
+    }
+
+    // create new SSL
+    SSL *ssl = SSL_new(ctx);
+    if (!ssl)
+    {
+        perror("Unable to create SSL\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    BIO *readBIO = BIO_new(BIO_s_mem());
+    BIO *writeBIO = BIO_new(BIO_s_mem());
+    SSL_set_bio(ssl, readBIO, writeBIO);
+    SSL_set_accept_state(ssl); // set to accept incoming connections
+
+    printf("Waiting for client to connect...\n");
+    int client_addr_len = sizeof(client_addr);
+
+    int client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_len);
+
+    if (client_socket < 0)
+    {
+        perror("Unable to accept connection\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("Client accepted\n");
+
+    // begin SSL handling
+    char buf[BUFSIZE];
+    while(!SSL_is_init_finished(ssl))
+    {
+        SSL_do_handshake(ssl);
+
+        int bytes_write = BIO_read(writeBIO, buf, BUFSIZE);
+        if (bytes_write > 0)
+        {
+            printf("Sending %d bytes to client\n", bytes_write);
+            sendto(client_socket, buf, bytes_write, 0, (struct sockaddr *)&client_addr, client_addr_len);
+        }
+        else
+        {
+            int bytes_received = recvfrom(client_socket, buf, BUFSIZE, 0, (struct sockaddr *)&client_addr, &client_addr_len);
+            if (bytes_received > 0)
+            {
+                printf("Received %d bytes from client\n", bytes_received);
+                BIO_write(readBIO, buf, bytes_received);
+            }
+        }
+    }
+
+    printf("SSL handshake complete\n");
+
+    while (1)
+    {
+        // receive data from client
+        int bytes_received = recvfrom(client_socket, buf, BUFSIZE, 0, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (bytes_received > 0)
+        {
+            printf("Received %d bytes from client\n", bytes_received);
+            BIO_write(readBIO, buf, bytes_received);
+        }
+
+        // read data from SSL
+        int bytes_read = SSL_read(ssl, buf, BUFSIZE);
+        if (bytes_read > 0)
+        {
+            printf("Received %d bytes from client\n", bytes_read);
+            printf("Received: %s\n", buf);
+        }
+
+        // write data to SSL
+        int bytes_write = BIO_read(writeBIO, buf, BUFSIZE);
+        if (bytes_write > 0)
+        {
+            printf("Sending %d bytes to client\n", bytes_write);
+            sendto(client_socket, buf, bytes_write, 0, (struct sockaddr *)&client_addr, client_addr_len);
+        }
+    }
+    close (client_socket);
+    EVP_cleanup();
     return 0;
 }
