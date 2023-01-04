@@ -28,13 +28,25 @@ int main() {
         return 0;
     }
 
+
     while(1) {
+        //create new socket to handle client
         len = sizeof(cliaddr);
-        printf("Receiving data...\n");
-        n = recvfrom(sockfd, mesg, MAXLINE, 0, (struct sockaddr *) &cliaddr, &len);
-        printf("Message from %s: %s", inet_ntoa(cliaddr.sin_addr), mesg);
-        printf("Sending data: %s\n", mesg);
-        sendto(sockfd, mesg, n, 0, (struct sockaddr *) &cliaddr, len);
+        int newsockfd = accept(sockfd, (struct sockaddr *) &cliaddr, &len);
+        if (newsockfd < 0) {
+            perror("Accept failed!");
+            return 0;
+        }
+        printf("Client connected: %s:%d\n", inet_ntoa(cliaddr.sin_addr), htons(cliaddr.sin_port));
+
+        //receive message from client
+        n = recv(newsockfd, mesg, MAXLINE, 0);
+        mesg[n] = 0;
+        printf("Received: %s", mesg);
+
+        //send message to client
+        send(newsockfd, mesg, n, 0);
+        printf("Sent: %s", mesg);
     }
 
     close(sockfd);

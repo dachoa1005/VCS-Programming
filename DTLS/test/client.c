@@ -25,11 +25,11 @@ int main(int agrc, char **argv) {
 
     while (fgets(sendline, MAXLINE, stdin) != NULL)
     {
-        printf("To server: %s", sendline);
         sendto(sockfd, sendline, strlen(sendline), 0, (struct sockaddr *) &servaddr, sizeof(servaddr));
+        printf("Sent: %s", sendline);
         n = recvfrom(sockfd, recvline, MAXLINE, 0, (struct sockaddr *) &from_socket, &addrlen);
         recvline[n] = 0;
-        printf("From server: %s %d %s", inet_ntoa(from_socket.sin_addr), htons(from_socket.sin_port), recvline);
+        printf("Received: %s", recvline);
     }
     
 }
