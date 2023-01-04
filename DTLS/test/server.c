@@ -28,7 +28,7 @@ int main() {
         return 0;
     }
 
-    for (; ;) {
+    while(1) {
         len = sizeof(cliaddr);
         printf("Receiving data...\n");
         n = recvfrom(sockfd, mesg, MAXLINE, 0, (struct sockaddr *) &cliaddr, &len);
