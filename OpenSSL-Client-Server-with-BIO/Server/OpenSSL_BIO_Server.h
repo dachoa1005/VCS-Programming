@@ -48,8 +48,8 @@ private:
     BIO* writeBIO;
 
     const int BUFFER_SIZE = 4096;
-    const char* CERT_FILE = "/home/dachoa/VCS-Programming/cert.pem";
-    const char* KEY_FILE = "/home/dachoa/VCS-Programming/key.pem";
+    const char* CERT_FILE = "/home/dachoa/VCS-Programming/OpenSSL-Client-Server-with-BIO/cert.pem";
+    const char* KEY_FILE = "/home/dachoa/VCS-Programming/OpenSSL-Client-Server-with-BIO/key.pem";
 };
 
 #endif /* OpenSSL_BIO_Server_H_ */
