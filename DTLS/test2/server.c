@@ -15,58 +15,27 @@
 
 #define SERVER_IP "127.0.0.1"
 #define DTLS_PORT 8888
-#define BUFSIZE 1024
-
-// int verify_cert(int ok, X509_STORE_CTX *ctx)
-// {
-//     char data[256];
-//     X509 *cert = X509_STORE_CTX_get_current_cert(ctx);
-//     X509_NAME_oneline(X509_get_subject_name(cert), data, 256);
-//     printf("subject: %s \n", data);
-//     X509_NAME_oneline(X509_get_issuer_name(cert), data, 256);
-//     printf("issuer: %s \n", data);
-//     return ok;
-// }
-
-// int generate_cookie(SSL *ssl, unsigned char *cookie, unsigned int *cookie_len)
-// {
-//     unsigned char *buffer, result[EVP_MAX_MD_SIZE];
-//     unsigned int length = 0, resultlength;
-
-//     // create buffer with address and port
-//     BIO_dgram_get_peer(SSL_get_rbio(ssl), (struct sockaddr *)&peer);
-//     length = sizeof(peer);
-//     buffer = OPENSSL_malloc(length);
-//     memcpy(buffer, &peer, length);
-
-//     // generate hash
-//     HMAC(EVP_sha1(), secret, secret_length, buffer, length, result, &resultlength);
-//     OPENSSL_free(buffer);
-
-//     // copy result to cookie
-//     memcpy(cookie, result, resultlength);
-//     *cookie_len = resultlength;
-//     return 1;
-// }
+#define BUFFER_SIZE 1024
 
 int main(int argc, char const *argv[])
 {
     struct sockaddr_in server_addr, client_addr;
     memset(&server_addr, 0, sizeof(server_addr));
+
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
     server_addr.sin_port = htons(DTLS_PORT);
 
     int server_socket = socket(AF_INET, SOCK_DGRAM, 0);
 
-    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr))){
+    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)))
+    {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
 
-
-    SSL_load_error_strings(); //readable error messages
-    SSL_library_init(); //initialize the library
+    SSL_load_error_strings(); // readable error messages
+    SSL_library_init();       // initialize the library
 
     const SSL_METHOD *method;
     SSL_CTX *ctx;
@@ -80,15 +49,13 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // SSL_CTX_set_options(ctx, SSL_);
-
     // load certificate and private key
-    if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0)
+    if (SSL_CTX_use_certificate_file(ctx, "sercert.pem", SSL_FILETYPE_PEM) <= 0)
     {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
-    if (SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM) <= 0)
+    if (SSL_CTX_use_PrivateKey_file(ctx, "serkey.pem", SSL_FILETYPE_PEM) <= 0)
     {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
@@ -108,17 +75,18 @@ int main(int argc, char const *argv[])
         perror("Unable to create SSL\n");
         exit(EXIT_FAILURE);
     }
-    
+
+    BIO *bio = BIO_new_dgram(server_socket, BIO_NOCLOSE); 
     BIO *readBIO = BIO_new(BIO_s_mem());
     BIO *writeBIO = BIO_new(BIO_s_mem());
+
     SSL_set_bio(ssl, readBIO, writeBIO);
     SSL_set_accept_state(ssl); // set to accept incoming connections
 
+    // wait for client to connect
     printf("Waiting for client to connect...\n");
-    int client_addr_len = sizeof(client_addr);
-
-    int client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_len);
-
+    socklen_t client_addr_len = sizeof(client_addr);
+    int client_socket = recvfrom(server_socket, NULL, 0, MSG_PEEK, (struct sockaddr *)&client_addr, &client_addr_len);
     if (client_socket < 0)
     {
         perror("Unable to accept connection\n");
@@ -127,57 +95,49 @@ int main(int argc, char const *argv[])
     printf("Client accepted\n");
 
     // begin SSL handling
-    char buf[BUFSIZE];
-    while(!SSL_is_init_finished(ssl))
-    {
-        SSL_do_handshake(ssl);
+    char buffer[BUFFER_SIZE];
+    int ret = 0;
+    // ret = BIO_do_handshake(bio);
 
-        int bytes_write = BIO_read(writeBIO, buf, BUFSIZE);
-        if (bytes_write > 0)
+    do {
+        // printf("SSL handshake...\n");
+        // Gọi hàm SSL_do_handshake() để thực hiện SSL Handshake
+        ret = SSL_do_handshake(ssl);
+
+        // Nếu cần đọc thêm dữ liệu từ socket, đọc dữ liệu và ghi vào readBIO
+        if (ret == SSL_ERROR_WANT_READ)
         {
-            printf("Sending %d bytes to client\n", bytes_write);
-            sendto(client_socket, buf, bytes_write, 0, (struct sockaddr *)&client_addr, client_addr_len);
-        }
-        else
-        {
-            int bytes_received = recvfrom(client_socket, buf, BUFSIZE, 0, (struct sockaddr *)&client_addr, &client_addr_len);
-            if (bytes_received > 0)
+            int receivedBytes = recvfrom(server_socket, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&client_addr, &client_addr_len);
+            if (receivedBytes > 0)
             {
-                printf("Received %d bytes from client\n", bytes_received);
-                BIO_write(readBIO, buf, bytes_received);
+                printf("Client has received %d bytes data\n", receivedBytes);
+                BIO_write(readBIO, buffer, receivedBytes);
+            } else {
+                printf("recvfrom() failed\n");
             }
-        }
-    }
+        } else if (ret == SSL_ERROR_WANT_WRITE)
+        {
+            // Nếu cần gửi dữ liệu đi, đọc dữ liệu từ writeBIO và gửi đi
+            int bytes_to_write = BIO_read(writeBIO, buffer, BUFFER_SIZE);
+            if (bytes_to_write > 0)
+            {
+                printf("Server has received %d bytes data\n", bytes_to_write);
+                sendto(server_socket, buffer, bytes_to_write, 0, (struct sockaddr *)&client_addr, client_addr_len);
+            }
+        }            
+        // if (ret != 1)
+        // {
+        //     int err = SSL_get_error(ssl, ret);
+        //     char *err_string = ERR_error_string(ERR_get_error(), NULL);
+        //     printf("SSL error: %d\n", err);
+        //     printf("SSL error string: %s\n", err_string);
 
+        // }
+    } while (ret != 1);
     printf("SSL handshake complete\n");
+    close(client_socket);
+    free(ssl);
+    SSL_CTX_free(ctx);
 
-    while (1)
-    {
-        // receive data from client
-        int bytes_received = recvfrom(client_socket, buf, BUFSIZE, 0, (struct sockaddr *)&client_addr, &client_addr_len);
-        if (bytes_received > 0)
-        {
-            printf("Received %d bytes from client\n", bytes_received);
-            BIO_write(readBIO, buf, bytes_received);
-        }
-
-        // read data from SSL
-        int bytes_read = SSL_read(ssl, buf, BUFSIZE);
-        if (bytes_read > 0)
-        {
-            printf("Received %d bytes from client\n", bytes_read);
-            printf("Received: %s\n", buf);
-        }
-
-        // write data to SSL
-        int bytes_write = BIO_read(writeBIO, buf, BUFSIZE);
-        if (bytes_write > 0)
-        {
-            printf("Sending %d bytes to client\n", bytes_write);
-            sendto(client_socket, buf, bytes_write, 0, (struct sockaddr *)&client_addr, client_addr_len);
-        }
-    }
-    close (client_socket);
-    EVP_cleanup();
     return 0;
 }

@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "rand.h": "c"
+        "rand.h": "c",
+        "ssl.h": "c"
     }
 }
