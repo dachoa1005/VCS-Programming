@@ -75,10 +75,9 @@ int main(int argc, char const *argv[])
         perror("Unable to create SSL\n");
         exit(EXIT_FAILURE);
     }
-
-    BIO *bio = BIO_new_dgram(server_socket, BIO_NOCLOSE); 
-    BIO *readBIO = BIO_new(BIO_s_mem());
-    BIO *writeBIO = BIO_new(BIO_s_mem());
+ 
+    BIO *readBIO = BIO_new_dgram(server_socket, BIO_NOCLOSE);
+    BIO *writeBIO = BIO_new_dgram(server_socket, BIO_NOCLOSE);
 
     SSL_set_bio(ssl, readBIO, writeBIO);
     SSL_set_accept_state(ssl); // set to accept incoming connections
@@ -102,6 +101,7 @@ int main(int argc, char const *argv[])
     do {
         // printf("SSL handshake...\n");
         // Gọi hàm SSL_do_handshake() để thực hiện SSL Handshake
+        BIO_dgram_set_peer(writeBIO, (struct sockaddr *)&client_addr);
         ret = SSL_do_handshake(ssl);
 
         // Nếu cần đọc thêm dữ liệu từ socket, đọc dữ liệu và ghi vào readBIO

@@ -30,6 +30,13 @@ int main(int argc, char const *argv[])
     SSL_load_error_strings();
     SSL_library_init();
 
+    // config server address
+    struct sockaddr_in server_addr;
+    socklen_t server_addr_len = sizeof(server_addr);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(DTLS_PORT);
+    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
+
     //create context
     const SSL_METHOD *method = DTLS_client_method();
     SSL_CTX *ctx = SSL_CTX_new(method);
@@ -70,20 +77,15 @@ int main(int argc, char const *argv[])
         return -1;
     }
 
-    BIO* bio = BIO_new_dgram(client_socket, BIO_NOCLOSE);
-    BIO *readBIO = BIO_new(BIO_s_mem());
-    BIO *writeBIO = BIO_new(BIO_s_mem());
+    BIO *readBIO = BIO_new_dgram(client_socket, BIO_NOCLOSE);
+    BIO *writeBIO = BIO_new_dgram(client_socket, BIO_NOCLOSE);
+
+    BIO_dgram_set_peer(writeBIO, &server_addr);
 
     SSL_set_bio(ssl, readBIO, writeBIO);
     SSL_set_connect_state(ssl); // set to connect to server
 
 
-    // connect to server
-    struct sockaddr_in server_addr;
-    socklen_t server_addr_len = sizeof(server_addr);
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(DTLS_PORT);
-    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
 
     if (connect(client_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
