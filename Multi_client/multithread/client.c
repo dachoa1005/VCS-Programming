@@ -41,10 +41,8 @@ int main(int argc, char const *argv[])
     while (1)
     {
         memset(buffer, 0, BUFFER_SIZE);
-        recv(client_socket, &buffer, BUFFER_SIZE, 0);
-        printf("Message from server: %s\n", buffer);
         printf("Enter a message:");
-        fgets(buffer, 256, stdin);
+        fgets(buffer, 1024, stdin);
         buffer[strlen(buffer) - 1] = '\0';
         int send_status = send(client_socket, buffer, BUFFER_SIZE, 0);
         if (send_status < 0)
@@ -55,6 +53,7 @@ int main(int argc, char const *argv[])
 
         if (strcmp(buffer, "exit") == 0)
             break;
+        recv(client_socket, &buffer, BUFFER_SIZE, 0);
         printf("Echo message from the server: %s\n", buffer);
     }
 

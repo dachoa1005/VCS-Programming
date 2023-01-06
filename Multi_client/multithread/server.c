@@ -89,24 +89,21 @@ int main(int argc, char const *argv[])
 void *connection_handle(void *client_socket)
 {
     int socket = *(int *)client_socket;
-    char server_msg[100] = "Hello from the server.\n";
-    int send_status;
-    send_status = send(socket, server_msg, BUFFER_SIZE, 0);
-    if (send_status == -1)
-    {
-        perror("send");
-        exit(EXIT_FAILURE);
-    }
-    char client_msg[100];
+    char buffer[BUFFER_SIZE];
 
     int read_len;
     do {
-        read_len = recv(socket, client_msg, BUFFER_SIZE, 0);
+        read_len = recv(socket, buffer, BUFFER_SIZE, 0);
         // end of string marker
-        client_msg[read_len] = '\0';
-        if (strcmp(client_msg, "exit") == 0)
+        buffer[read_len] = '\0';
+        if (strcmp(buffer, "exit") == 0)
             break;
-        send_status = send(socket, client_msg, strlen(client_msg), 0);
+        int send_status = send(socket, buffer, BUFFER_SIZE, 0);
+        if (send_status < 0)
+        {
+            perror("Send failed");
+            exit(EXIT_FAILURE);
+        }
     } while (read_len > 0);
 
     return 0;
