@@ -100,10 +100,7 @@ int main(int argc, char const *argv[])
     char buffer[BUFSIZE];
     char buf[BUFSIZE];
     
-    BIO_ctrl(writeBIO, BIO_CTRL_DGRAM_SET_CONNECTED, 0, &server_addr); // set server address
-
-
-
+    // BIO_ctrl(writeBIO, BIO_CTRL_DGRAM_SET_CONNECTED, 0, &server_addr); // set server address
 
     do {
         // Gọi hàm SSL_do_handshake() để thực hiện SSL Handshake

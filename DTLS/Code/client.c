@@ -9,133 +9,132 @@
 #include <fcntl.h>
 #include <openssl/rand.h>
 #include <arpa/inet.h>
-#include <openssl/err.h>
 #include <netdb.h>
+#include <openssl/bio.h>
+#include <openssl/err.h>
 
+#define SERVER_IP "127.0.0.1"
 #define DTLS_PORT 8888
-#define BUFFER_SIZE 1024
+#define BUFSIZE 1024
 
 int main(int argc, char const *argv[])
 {
-    // Create a UDP socket for the DTLS connection
-    struct sockaddr_in servaddr;
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(DTLS_PORT);
-    servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    // Create the socket
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0)
+    // create socket
+    int client_socket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (client_socket < 0)
     {
-        printf("Socket not created\n");
+        perror("Unable to create socket");
         return -1;
     }
-    else
-    {
-        printf("Socket created\n");
-    }
 
-    // int bind_status = bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
-    // if (bind_status < 0)
-    // {
-    //     printf("Socket not binded\n");
-    //     return -1;
-    // }
-    // else
-    // {
-    //     printf("Socket binded\n");
-    // }
-
-    // Initialize the DTLS context and set up the server or client SSL object
+    SSL_load_error_strings();
     SSL_library_init();
 
-    // Create the DTLS context
-    SSL_CTX *ctx;
-    ctx = SSL_CTX_new(DTLS_client_method());
+    // config server address
+    struct sockaddr_in server_addr;
+    socklen_t server_addr_len = sizeof(server_addr);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(DTLS_PORT);
+    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
+
+    //create context
+    const SSL_METHOD *method = DTLS_client_method();
+    SSL_CTX *ctx = SSL_CTX_new(method);
     if (ctx == NULL)
     {
-        printf("DTLS context not created\n");
+        printf("Unable to create SSL context\n");
         return -1;
     }
-    else
+
+    SSL_CTX_set_ecdh_auto(ctx, 1); // cấu hình tự động sử dụng giao thức ECDH - Elliptic Curve Diffie-Hellman
+    // Giao thức ECDH là một giao thức khóa riêng có sử dụng đường cong eliptic để chia sẻ khóa giữa hai bên kết nối để mã hóa dữ liệu truyền giữa hai bên.
+
+    // set key and cert
+    if (SSL_CTX_use_certificate_file(ctx, "clicert.pem", SSL_FILETYPE_PEM) <= 0)
     {
-        printf("DTLS context created\n");
+        printf("Unable to set certificate file\n");
+        return -1;
     }
 
-    // Create the client SSL object
-    SSL *ssl = NULL;
-    ssl = SSL_new(ctx);
+    if (SSL_CTX_use_PrivateKey_file(ctx, "clikey.pem", SSL_FILETYPE_PEM) <= 0)
+    {
+        printf("Unable to set private key file\n");
+        return -1;
+    }
+
+    // verify certificate
+    if (!SSL_CTX_check_private_key(ctx))
+    {
+        printf("Private key and certificate do not match\n");
+        return -1;
+    }
+
+    // create new SSL
+    SSL *ssl = SSL_new(ctx);
     if (ssl == NULL)
     {
-        printf("Client SSL object not created\n");
+        printf("Unable to create SSL\n");
         return -1;
     }
-    else
-    {
-        printf("Client SSL object created\n");
-    }
-  
 
-    // Set the socket to be used by the SSL object
-    int setfd_status = SSL_set_fd(ssl, sockfd);
-    if (setfd_status <= 0)
+    BIO *readBIO = BIO_new_dgram(client_socket, BIO_NOCLOSE);
+    BIO *writeBIO = BIO_new_dgram(client_socket, BIO_NOCLOSE);
+
+    // BIO_dgram_set_peer(writeBIO, &server_addr);
+
+    SSL_set_bio(ssl, readBIO, writeBIO);
+    SSL_set_connect_state(ssl); // set to connect to server
+
+
+
+    if (connect(client_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
-        printf("Could not set socket to be used by SSL object\n");
+        perror("Unable to connect to server");
         return -1;
     }
-    else
-    {
-        printf("Socket set to be used by SSL object\n");
-    }
 
-    // Set the server address
-    // SSL_set_connect_state(ssl);
+    printf("Connected to server\n");
+
+    // begin SSL handshake
+    int ret = 0;
+    char buffer[BUFSIZE];
+    char buf[BUFSIZE];
     
-    // Connect to the server
-    int connect_status = SSL_connect(ssl);
-    if (connect_status <= 0)
-    {
-        // printf("%d", connect_status);
-        printf("Could not connect to server\n");
-        return -1;
-    }
-    else
-    {
-        printf("Connected to server\n");
-    }
+    // BIO_ctrl(writeBIO, BIO_CTRL_DGRAM_SET_CONNECTED, 0, &server_addr); // set server address
 
-    // Send a message to the server
-    char *msg = "Hello from client";
-    // int len = strlen(msg);
-    int bytes_sent = SSL_write(ssl, msg, BUFFER_SIZE);
-    if (bytes_sent < 0)
-    {
-        printf("Could not send message to server\n");
-        return -1;
-    }
-    else
-    {
-        printf("Sent message to server\n");
-    }
+    do {
+        // Gọi hàm SSL_do_handshake() để thực hiện SSL Handshake
+        ret = SSL_do_handshake(ssl);
 
-    // Receive a message from the server
-    char buf[BUFFER_SIZE];
-    int bytes_read = SSL_read(ssl, buf, BUFFER_SIZE);
-    if (bytes_read < 0)
-    {
-        printf("Could not receive message from server\n");
-        return -1;
-    }
-    else
-    {
-        printf("Received message from server: %s\n", buf);
-    }
+        // Nếu cần đọc thêm dữ liệu từ socket, đọc dữ liệu và ghi vào readBIO
+        if (ret == SSL_ERROR_WANT_READ) {
+            int receivedBytes = recvfrom(client_socket, buffer, BUFSIZE, 0, (struct sockaddr*)&server_addr, &server_addr_len);
+            if (receivedBytes > 0) {
+                printf("Client has received %d bytes data\n", receivedBytes);
+                BIO_write(readBIO, buffer, receivedBytes);
+            }
+        }
 
-    // Close the socket
-    close(sockfd);
+        // Nếu có dữ liệu mã hóa để gửi đi, gửi dữ liệu mã hóa đó đến server
+        int bytesToWrite = BIO_read(writeBIO, buffer, BUFSIZE);
+        if (bytesToWrite > 0) {
+            printf("Client has %d bytes encrypted data to send\n", bytesToWrite);
+            int bytes_sent = sendto(client_socket, buffer, bytesToWrite, 0, (struct sockaddr*)&server_addr, server_addr_len);
+            if (bytes_sent >= 0)
+            {
+                printf("Sent %d bytes to server\n", bytes_sent);
+            } else {
+                perror("Unable to send data to server");
+                exit(1);
+            }
+        }
+    } while (ret != 1);
 
-    // Free the SSL object
+    printf("SSL handshake complete\n");
+
+    close(client_socket);
     SSL_free(ssl);
+    SSL_CTX_free(ctx);
+    
     return 0;
 }

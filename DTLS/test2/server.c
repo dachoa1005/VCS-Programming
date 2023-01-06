@@ -97,7 +97,7 @@ int main(int argc, char const *argv[])
     char buffer[BUFFER_SIZE];
     int ret = 0;
 
-    BIO_ctrl(writeBIO, BIO_CTRL_DGRAM_SET_CONNECTED, 0, (struct sockaddr *)&client_addr); // set peer address
+    // BIO_ctrl(writeBIO, BIO_CTRL_DGRAM_SET_CONNECTED, 0, (struct sockaddr *)&client_addr); // set peer address
 
     do {
         // printf("SSL handshake...\n");
