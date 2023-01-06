@@ -46,23 +46,25 @@ int main(int argc, char const *argv[])
 
     while (1)
     {
+        memset(buffer, 0, BUFFER_SIZE);
+
         // send message to server
-        printf("Enter message: ");
-        fgets(buffer, BUFFER_SIZE, stdin);
-        buffer[strlen(buffer) - 1] = '\0'; // remove trailing newline
-        if (send(client_socket, buffer, strlen(buffer), 0) < 0)
+        printf("Enter a message:");
+        fgets(buffer, 1024, stdin);
+        buffer[strlen(buffer) - 1] = '\0';
+        int send_status = send(client_socket, buffer, BUFFER_SIZE, 0);
+        if (send_status < 0)
         {
-            perror("Send failed");
-            exit(EXIT_FAILURE);
+            printf("Send failed\n");
+            break;
         }
 
+        if (strcmp(buffer, "exit") == 0)
+            break;
+
         // receive message from server
-        if (recv(client_socket, buffer, BUFFER_SIZE, 0) < 0)
-        {
-            perror("Receive failed");
-            exit(EXIT_FAILURE);
-        }
-        printf("Echo message from server: %s", buffer);
+        recv(client_socket, &buffer, BUFFER_SIZE, 0);
+        printf("Echo message from the server: %s\n", buffer);
     }
 
     return 0;
