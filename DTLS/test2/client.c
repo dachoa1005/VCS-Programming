@@ -80,7 +80,7 @@ int main(int argc, char const *argv[])
     BIO *readBIO = BIO_new_dgram(client_socket, BIO_NOCLOSE);
     BIO *writeBIO = BIO_new_dgram(client_socket, BIO_NOCLOSE);
 
-    BIO_dgram_set_peer(writeBIO, &server_addr);
+    // BIO_dgram_set_peer(writeBIO, &server_addr);
 
     SSL_set_bio(ssl, readBIO, writeBIO);
     SSL_set_connect_state(ssl); // set to connect to server
@@ -100,6 +100,11 @@ int main(int argc, char const *argv[])
     char buffer[BUFSIZE];
     char buf[BUFSIZE];
     
+    BIO_ctrl(writeBIO, BIO_CTRL_DGRAM_SET_CONNECTED, 0, &server_addr); // set server address
+
+
+
+
     do {
         // Gọi hàm SSL_do_handshake() để thực hiện SSL Handshake
         ret = SSL_do_handshake(ssl);

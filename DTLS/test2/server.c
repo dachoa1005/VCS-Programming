@@ -96,18 +96,20 @@ int main(int argc, char const *argv[])
     // begin SSL handling
     char buffer[BUFFER_SIZE];
     int ret = 0;
-    // ret = BIO_do_handshake(bio);
+
+    BIO_ctrl(writeBIO, BIO_CTRL_DGRAM_SET_CONNECTED, 0, (struct sockaddr *)&client_addr); // set peer address
 
     do {
         // printf("SSL handshake...\n");
         // Gọi hàm SSL_do_handshake() để thực hiện SSL Handshake
-        BIO_dgram_set_peer(writeBIO, (struct sockaddr *)&client_addr);
+        // BIO_dgram_set_peer(writeBIO, (struct sockaddr *)&client_addr);
         ret = SSL_do_handshake(ssl);
 
         // Nếu cần đọc thêm dữ liệu từ socket, đọc dữ liệu và ghi vào readBIO
         if (ret == SSL_ERROR_WANT_READ)
         {
             int receivedBytes = recvfrom(server_socket, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&client_addr, &client_addr_len);
+            printf("Received bytes: %d\n", receivedBytes); 
             if (receivedBytes > 0)
             {
                 printf("Client has received %d bytes data\n", receivedBytes);
