@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 
 #define BUFFER_SIZE 1024
+#define MAX_CLIENTS 1000
 
 void handle_client(int client_socket)
 {
@@ -63,13 +64,13 @@ int main(int argc, char const *argv[])
     printf("Socket bind to port %d.\n", port);
 
     // Listen for incoming connections
-    if (listen(server_socket, 1000) < 0)
+    if (listen(server_socket, MAX_CLIENTS) < 0)
     {
         perror("listen");
         exit(EXIT_FAILURE);
     }
-
-    while (1)
+    int client_count = 0;
+    while (client_count < MAX_CLIENTS)
     {
         // accept incoming connection
         printf("Listening for incoming connection...\n");
@@ -81,6 +82,9 @@ int main(int argc, char const *argv[])
             perror("Accept failed");
             exit(EXIT_FAILURE);
         }
+        printf("Connection number: %d accepted from %s\n", client_count + 1, inet_ntoa(client_address.sin_addr));
+        // create child process to handle new connection
+        client_count++;
 
         // create child process to handle new connection
         pid_t pid = fork();
@@ -92,7 +96,6 @@ int main(int argc, char const *argv[])
         } else if (pid == 0)
         {
             // child process
-            printf("New connection accepted from %s\n", inet_ntoa(client_address.sin_addr));
             close(server_socket);
             handle_client(client_socket);
             exit(0);
