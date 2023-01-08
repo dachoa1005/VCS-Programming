@@ -85,8 +85,6 @@ int main(int argc, char const *argv[])
     SSL_set_bio(ssl, readBIO, writeBIO);
     SSL_set_connect_state(ssl); // set to connect to server
 
-
-
     if (connect(client_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
         perror("Unable to connect to server");
