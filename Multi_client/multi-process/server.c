@@ -10,23 +10,7 @@
 #define BUFFER_SIZE 1024
 #define MAX_CLIENTS 1000
 
-void handle_client(int client_socket)
-{
-    char buffer[BUFFER_SIZE];
-    int n;
-
-    while (1)
-    {
-        // receive message from client
-        memset(buffer, 0, BUFFER_SIZE);
-        n = recv(client_socket, buffer, BUFFER_SIZE, 0);
-        if (n < 0)
-        {
-            perror("Receive failed");
-            exit(EXIT_FAILURE);
-        }
-    }
-}
+void handle_client(int client_socket);
 
 int main(int argc, char const *argv[])
 {
@@ -76,27 +60,22 @@ int main(int argc, char const *argv[])
         printf("Listening for incoming connection...\n");
 
         int client_addr_len = sizeof(client_address);
-        client_socket = accept(server_socket, (struct sockaddr *)&client_address, &client_addr_len);
+        client_socket = accept(server_socket, (struct sockaddr *)&server_address, (socklen_t *)&addrlen);
         if (client_socket < 0)
         {
             perror("Accept failed");
             exit(EXIT_FAILURE);
         }
-        printf("Connection number: %d accepted from %s\n", client_count + 1, inet_ntoa(client_address.sin_addr));
-        // create child process to handle new connection
+        printf("Connection number: %d accepted.\n", client_count + 1);
         client_count++;
 
         // create child process to handle new connection
         pid_t pid = fork();
 
-        if (pid < 0)
-        {
-            perror("Fork failed");
-            exit(EXIT_FAILURE);
-        } else if (pid == 0)
+        if (pid == 0)
         {
             // child process
-            close(server_socket);
+            // close(server_socket); // to handle only 1 connection
             handle_client(client_socket);
             exit(0);
         } else {
@@ -108,3 +87,29 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
+void handle_client(int client_socket)
+{
+    char buffer[BUFFER_SIZE];
+    int n;
+
+    while (1)
+    {
+        // receive message from client
+        memset(buffer, 0, BUFFER_SIZE);
+        n = recv(client_socket, buffer, BUFFER_SIZE, 0);
+        if (n < 0)
+        {
+            perror("Receive failed");
+            exit(EXIT_FAILURE);
+        }
+
+        //send message to client
+        memset(buffer, 0, BUFFER_SIZE);
+        n = send(client_socket, buffer, BUFFER_SIZE, 0);
+        if (n < 0)
+        {
+            perror("Receive failed");
+            exit(EXIT_FAILURE);
+        }
+    }
+}

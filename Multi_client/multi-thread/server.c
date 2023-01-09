@@ -70,7 +70,7 @@ int main(int argc, char const *argv[])
     printf("Socket bind to port %d.\n", port);
 
     // Listen for incoming connections
-    if (listen(server_socket, 1000) < 0)
+    if (listen(server_socket, MAX_CLIENTS) < 0)
     {
         perror("listen");
         exit(EXIT_FAILURE);
