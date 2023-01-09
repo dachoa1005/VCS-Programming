@@ -75,15 +75,18 @@ int main(int argc, char const *argv[])
         if (pid == 0)
         {
             // child process
+            // printf("New process started\n");
             // close(server_socket); // to handle only 1 connection
             handle_client(client_socket);
-            exit(0);
-        } else {
-            // parent process
             close(client_socket);
+            exit(0);
         }
+        // else
+        // {
+        //     // parent process
+        // }
     }
-    
+
     return 0;
 }
 
@@ -92,24 +95,19 @@ void handle_client(int client_socket)
     char buffer[BUFFER_SIZE];
     int n;
 
-    while (1)
+    int read_len;
+    do
     {
-        // receive message from client
-        memset(buffer, 0, BUFFER_SIZE);
-        n = recv(client_socket, buffer, BUFFER_SIZE, 0);
-        if (n < 0)
+        read_len = recv(client_socket, buffer, BUFFER_SIZE, 0);
+        // end of string marker
+        buffer[read_len] = '\0';
+        if (strcmp(buffer, "exit") == 0)
+            break;
+        int send_status = send(client_socket, buffer, BUFFER_SIZE, 0);
+        if (send_status < 0)
         {
-            perror("Receive failed");
+            perror("Send failed");
             exit(EXIT_FAILURE);
         }
-
-        //send message to client
-        memset(buffer, 0, BUFFER_SIZE);
-        n = send(client_socket, buffer, BUFFER_SIZE, 0);
-        if (n < 0)
-        {
-            perror("Receive failed");
-            exit(EXIT_FAILURE);
-        }
-    }
+    } while (read_len > 0);
 }
