@@ -15,7 +15,7 @@
 
 #define SERVER_IP "127.0.0.1"
 #define DTLS_PORT 8888
-#define BUFSIZE 1024
+#define BUFFER_SIZE 1024
 
 int main(int argc, char const *argv[])
 {
@@ -36,6 +36,16 @@ int main(int argc, char const *argv[])
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(DTLS_PORT);
     server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
+
+    // send hello message to server 
+    char buffer[BUFFER_SIZE];
+    strcpy(buffer, "Client hello");
+    if (sendto(client_socket, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&server_addr, server_addr_len) < 0)
+    {
+        printf("Cannot send hello message to server\n");
+        return 1;
+    }
+    printf("Hello message sent\n");
 
     //create context
     const SSL_METHOD *method = DTLS_client_method();
@@ -85,18 +95,10 @@ int main(int argc, char const *argv[])
     SSL_set_bio(ssl, readBIO, writeBIO);
     SSL_set_connect_state(ssl); // set to connect to server
 
-    if (connect(client_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
-    {
-        perror("Unable to connect to server");
-        return -1;
-    }
 
-    printf("Connected to server\n");
 
     // begin SSL handshake
     int ret = 0;
-    char buffer[BUFSIZE];
-    char buf[BUFSIZE];
     
     // BIO_ctrl(writeBIO, BIO_CTRL_DGRAM_SET_CONNECTED, 0, &server_addr); // set server address
 
@@ -106,7 +108,7 @@ int main(int argc, char const *argv[])
 
         // Nếu cần đọc thêm dữ liệu từ socket, đọc dữ liệu và ghi vào readBIO
         if (ret == SSL_ERROR_WANT_READ) {
-            int receivedBytes = recvfrom(client_socket, buffer, BUFSIZE, 0, (struct sockaddr*)&server_addr, &server_addr_len);
+            int receivedBytes = recvfrom(client_socket, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&server_addr, &server_addr_len);
             if (receivedBytes > 0) {
                 printf("Client has received %d bytes data\n", receivedBytes);
                 BIO_write(readBIO, buffer, receivedBytes);
@@ -114,7 +116,7 @@ int main(int argc, char const *argv[])
         }
 
         // Nếu có dữ liệu mã hóa để gửi đi, gửi dữ liệu mã hóa đó đến server
-        int bytesToWrite = BIO_read(writeBIO, buffer, BUFSIZE);
+        int bytesToWrite = BIO_read(writeBIO, buffer, BUFFER_SIZE);
         if (bytesToWrite > 0) {
             printf("Client has %d bytes encrypted data to send\n", bytesToWrite);
             int bytes_sent = sendto(client_socket, buffer, bytesToWrite, 0, (struct sockaddr*)&server_addr, server_addr_len);

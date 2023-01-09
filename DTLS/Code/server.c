@@ -19,6 +19,9 @@
 
 int main(int argc, char const *argv[])
 {
+    SSL_load_error_strings(); // readable error messages
+    SSL_library_init();       // initialize the library
+    
     struct sockaddr_in server_addr, client_addr;
     memset(&server_addr, 0, sizeof(server_addr));
 
@@ -33,9 +36,6 @@ int main(int argc, char const *argv[])
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
-
-    SSL_load_error_strings(); // readable error messages
-    SSL_library_init();       // initialize the library
 
     const SSL_METHOD *method;
     SSL_CTX *ctx;
@@ -85,16 +85,15 @@ int main(int argc, char const *argv[])
     // wait for client to connect
     printf("Waiting for client to connect...\n");
     socklen_t client_addr_len = sizeof(client_addr);
-    int client_socket = recvfrom(server_socket, NULL, 0, MSG_PEEK, (struct sockaddr *)&client_addr, &client_addr_len);
-    if (client_socket < 0)
+    char buffer[BUFFER_SIZE];
+    if (recvfrom(server_socket, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&client_addr, &client_addr_len) < 0)
     {
-        perror("Unable to accept connection\n");
-        exit(EXIT_FAILURE);
+        printf("Cannot receive Client hello message\n");
+        return 1;
     }
     printf("Client accepted\n");
 
     // begin SSL handling
-    char buffer[BUFFER_SIZE];
     int ret = 0;
 
     // BIO_ctrl(writeBIO, BIO_CTRL_DGRAM_SET_CONNECTED, 0, (struct sockaddr *)&client_addr); // set peer address
@@ -137,8 +136,7 @@ int main(int argc, char const *argv[])
         // }
     } while (ret != 1);
     printf("SSL handshake complete\n");
-    close(client_socket);
-    free(ssl);
+    SSL_free(ssl);
     SSL_CTX_free(ctx);
 
     return 0;
