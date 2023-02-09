@@ -2,106 +2,140 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
+#include <pthread.h>
 
-#define PORT 5550
-#define MAX_CLIENTS 100
+#define MAX_CLIENTS 1000
+#define BUFFER_SIZE 1024
 
-typedef struct client_info
+typedef struct
 {
-    int socket_fd;
-    char name[100];
+    int sockfd;
+    char *name;
 } Client;
 
 Client clients[MAX_CLIENTS];
-int num_clients = 0;
+int client_number = 0;
 
-// listen for new connections
-void listen_connections(int server_socket)
+void *connection_handle(void *client_sockfd)
 {
-    while (1)
+    int socket = *(int *)client_sockfd; // get client_sockfd value
+    char buffer[BUFFER_SIZE];
+
+    int read_len;
+    do
     {
-        struct sockaddr_in client_addr;
-        int client_addr_len = sizeof(client_addr);
-        int client_socket = accept(server_socket, (struct sockaddr *)&client_addr, (socklen_t *)&client_addr_len);
-        if (client_socket < 0)
+        read_len = recv(socket, buffer, BUFFER_SIZE, 0);
+        // end of string marker
+        buffer[read_len] = '\0';
+        if (read_len > 0)
         {
-            perror("accept");
-            exit(1);
-        }
-
-        // add client to clients array
-        clients[num_clients].socket_fd = client_socket;
-        sprintf(clients[num_clients].name, "Client %d", num_clients + 1);
-        num_clients++;
-
-        // create new process to handle this client
-        pid_t pid = fork();
-        if (pid == 0)
-        {
-            // child process
-            char message[1000];
-            while (1)
+            for (int i = 0; i < client_number; i++)
             {
-                int n = recv(client_socket, message, sizeof(message), 0);
-                if (n <= 0)
+                if (clients[i].sockfd != socket && clients[i].sockfd > 0)
                 {
-                    break;
-                } else {
-                    message[n] = '\0';
-                    printf("%s: %s", clients[num_clients - 1].name, message);
-                }
-                // forward message to all clients
-                for (int i = 0; i < num_clients; i++)
-                {
-                    if (clients[i].socket_fd != client_socket)
-                    {
-                        send(clients[i].socket_fd, message, 1024, 0);
-                    }
+                    send(clients[i].sockfd, buffer, BUFFER_SIZE, 0);
                 }
             }
-
-            close(client_socket);
-            exit(0);
         }
-        else if (pid < 0)
+        else
         {
-            perror("fork");
-            exit(1);
+            printf("Client %d has closed the connection\n", socket);
+            // delete client from clients array
+            for (int j = 0; j < client_number; j++)
+            {
+                if (socket == clients[j].sockfd)
+                {
+                    clients[j].sockfd = -1;
+                    break;
+                }
+            }
         }
-    }
+
+    } while (read_len > 0);
+
+    return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char const *argv[])
 {
-    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_socket < 0)
+    // init clients sockfd array
+    for (int i = 0; i < MAX_CLIENTS; i++)
     {
-        perror("socket");
-        exit(1);
+        clients[i].sockfd = -1;
     }
 
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    server_addr.sin_port = htons(PORT);
-
-    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    if (argc < 2)
     {
-        perror("bind");
-        exit(1);
+        printf("Usage: %s <port>\n", argv[0]);
+        exit(EXIT_FAILURE);
     }
+    int port = atoi(argv[1]);
+    int server_sockfd, client_sockfd;
+    struct sockaddr_in server_address;
+    int addrlen = sizeof(server_address);
+    char buffer[BUFFER_SIZE] = {0};
+    pthread_t threads[MAX_CLIENTS];
+    int thread_count = 0;
 
-    if (listen(server_socket, 10) < 0)
+    // Create server socket
+    if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
+    printf("Server socket created.\n");
+
+    // Set socket option
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = INADDR_ANY;
+    server_address.sin_port = htons(port);
+
+    // Bind socket to port
+    if (bind(server_sockfd, (struct sockaddr *)&server_address, sizeof(server_address)) < 0)
+    {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
+    }
+    printf("Socket bind to port %d.\n", port);
+
+    // Listen for incoming connections
+    if (listen(server_sockfd, MAX_CLIENTS) < 0)
     {
         perror("listen");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
-    listen_connections(server_socket);
+    while (1)
+    {
+        printf("Listening on port %d\n", port);
+        // Accept connection from client
+        client_sockfd = accept(server_sockfd, (struct sockaddr *)&server_address, (socklen_t *)&addrlen);
+        if (client_sockfd < 0)
+        {
+            perror("accept");
+            exit(EXIT_FAILURE);
+        }
+        clients[client_number].sockfd = client_sockfd;
+        client_number += 1;
+        printf("Client has socketfd: %d has connected.\n\n", client_sockfd);
+
+        // create thread to handle each client
+        if (pthread_create(&threads[client_number], NULL, connection_handle, (void *)&client_sockfd) != 0)
+        {
+            perror("pthread_create");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // join threads
+    // int i = 0;
+    // for (i = 0; i < thread_count; i++)
+    // {
+    //     pthread_join(threads[i], NULL);
+    // }
 
     return 0;
 }
