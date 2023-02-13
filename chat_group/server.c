@@ -23,8 +23,23 @@ void *connection_handle(void *client_sockfd)
 {
     int socket = *(int *)client_sockfd; // get client_sockfd value
     char buffer[BUFFER_SIZE];
-
+    int current_client_index = client_number; // get current client index
+    // get current client index
+    // for (int i = 0; i < MAX_CLIENTS; i++)
+    // {
+    //     if (clients[i].sockfd == socket)
+    //     {
+    //         break;
+    //     }
+    // }
+    // get client name
     int read_len;
+    read_len = recv(socket, buffer, BUFFER_SIZE, 0);
+    buffer[read_len] = '\0';
+    clients[current_client_index].name = malloc(strlen(buffer) + 1);
+    strcpy(clients[current_client_index].name, buffer);
+    printf("Client %d has joined the chat with name %s\n", socket, clients[client_number].name);
+
     do
     {
         read_len = recv(socket, buffer, BUFFER_SIZE, 0);
@@ -32,6 +47,12 @@ void *connection_handle(void *client_sockfd)
         buffer[read_len] = '\0';
         if (read_len > 0)
         {
+            // add client name to buffer 
+            char temp[BUFFER_SIZE];
+            strcpy(temp, clients[current_client_index].name);
+            strcat(temp, ": ");
+            strcat(temp, buffer);
+            strcpy(buffer, temp);
             for (int i = 0; i < client_number; i++)
             {
                 if (clients[i].sockfd != socket && clients[i].sockfd > 0)
@@ -42,7 +63,7 @@ void *connection_handle(void *client_sockfd)
         }
         else
         {
-            printf("Client %d has closed the connection\n", socket);
+            printf("Client %s has closed the connection\n", clients[current_client_index].name);
             // delete client from clients array
             for (int j = 0; j < client_number; j++)
             {
@@ -129,13 +150,6 @@ int main(int argc, char const *argv[])
             exit(EXIT_FAILURE);
         }
     }
-
-    // join threads
-    // int i = 0;
-    // for (i = 0; i < thread_count; i++)
-    // {
-    //     pthread_join(threads[i], NULL);
-    // }
 
     return 0;
 }

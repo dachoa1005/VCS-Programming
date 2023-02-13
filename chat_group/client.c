@@ -13,11 +13,22 @@ void *send_message(void *client_sockfd)
 {
     int socket = *(int *)client_sockfd;
     char message[1024];
-    
+
+    // enter name and send to server
+    printf("Enter your name: ");
+    fgets(message, 1024, stdin);
+    message[strlen(message) - 1] = '\0';
+    if (send(socket, message, 1024, 0) < 0)
+    {
+        perror("send");
+        exit(1);
+    }
+
     while (1)
     {
         // printf("Enter message: ");
         fgets(message, 1024, stdin);
+        message[strlen(message) - 1] = '\0';
         if (send(socket, message, 1024, 0) < 0)
         {
             perror("send");
@@ -44,7 +55,7 @@ void *recv_message(void *client_sockfd)
             exit(1);
         }
         message[recv_len] = '\0';
-        printf("Client: %s", message);
+        printf("%s\n",message);
         
     }
 }
