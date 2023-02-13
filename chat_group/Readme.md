@@ -1,14 +1,14 @@
 # Chat Group
 1. Make 
-2. ./server <port-number>
-3. Mở thêm n terminal khác, mỗi terminal chạy ./client <port-number>
+2. ./server port-number
+3. Mở thêm n terminal khác, mỗi terminal chạy ./client port-number
 
 ## Giải thích
 1. Server
     - Định nghĩa 1 struct để lưu trữ thông tin của 1 client bao gồm socketfd và client name.
     - Tạo 1 mảng clients để lưu trữ thông tin các client.
     - Init mảng clients với mỗi client có sockfd = -1 và name = NULL.
-    - Dùng vòng lặp while(1) để luôn listen trên <port-number>.
+    - Dùng vòng lặp while(1) để luôn listen trên port-number.
     - Mỗi khi có client kết nối đến server, dùng biến client_sockfd để lưu trữ giá trị của hàm accept và thêm giá trị này vào mảng clients ở trên.
     - Tạo 1 thread mới để xử lý connection này:
         + Nhận client_name bằng hàm recv().
