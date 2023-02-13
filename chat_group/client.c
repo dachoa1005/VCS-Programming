@@ -19,7 +19,7 @@ void *send_message(void *client_sockfd)
         printf("Enter your name: ");
         fgets(message, 1024, stdin);
         message[strlen(message) - 1] = '\0';
-        if (strcmp(message, "")!= 0)
+        if (strcmp(message, "") != 0)
             break;
     }
     if (send(socket, message, 1024, 0) < 0)
@@ -33,10 +33,13 @@ void *send_message(void *client_sockfd)
         // printf("Enter message: ");
         fgets(message, 1024, stdin);
         message[strlen(message) - 1] = '\0';
-        if (send(socket, message, 1024, 0) < 0)
+        if (strcmp(message, "") != 0)
         {
-            perror("send");
-            exit(1);
+            if (send(socket, message, 1024, 0) < 0)
+            {
+                perror("send");
+                exit(1);
+            }
         }
     }
 }

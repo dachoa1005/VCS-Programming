@@ -23,22 +23,24 @@ void *connection_handle(void *client_sockfd)
 {
     int socket = *(int *)client_sockfd; // get client_sockfd value
     char buffer[BUFFER_SIZE];
-    int current_client_index = client_number; // get current client index
-    // get current client index
-    // for (int i = 0; i < MAX_CLIENTS; i++)
-    // {
-    //     if (clients[i].sockfd == socket)
-    //     {
-    //         break;
-    //     }
-    // }
+    char *client_name; 
+    int read_len = 0;
+
     // get client name
-    int read_len;
-    read_len = recv(socket, buffer, BUFFER_SIZE, 0);
-    buffer[read_len] = '\0';
-    clients[current_client_index].name = malloc(strlen(buffer) + 1);
-    strcpy(clients[current_client_index].name, buffer);
-    printf("Client %d has joined the chat with name %s\n", socket, clients[client_number].name);
+    recv(socket, buffer, BUFFER_SIZE, 0);
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        if (clients[i].sockfd == socket)
+        {
+            clients[i].name = malloc(strlen(buffer) + 1);
+            strcpy(clients[i].name, buffer);
+            client_name = malloc(strlen(buffer) + 1);
+            strcpy(client_name, buffer);
+            break;
+        }
+    }
+
+    printf("Client %s has joined the chat\n", client_name);
 
     do
     {
@@ -49,13 +51,13 @@ void *connection_handle(void *client_sockfd)
         {
             // add client name to buffer 
             char temp[BUFFER_SIZE];
-            strcpy(temp, clients[current_client_index].name);
+            strcpy(temp, client_name);
             strcat(temp, ": ");
             strcat(temp, buffer);
             strcpy(buffer, temp);
-            for (int i = 0; i < client_number; i++)
+            for (int i = 0; i < MAX_CLIENTS; i++)
             {
-                if (clients[i].sockfd != socket && clients[i].sockfd > 0)
+                if (clients[i].sockfd != socket && clients[i].sockfd > 0 && clients[i].name != NULL)
                 {
                     send(clients[i].sockfd, buffer, BUFFER_SIZE, 0);
                 }
@@ -63,9 +65,9 @@ void *connection_handle(void *client_sockfd)
         }
         else
         {
-            printf("Client %s has closed the connection\n", clients[current_client_index].name);
+            printf("Client %s has closed the connection\n", client_name);
             // delete client from clients array
-            for (int j = 0; j < client_number; j++)
+            for (int j = 0; j < MAX_CLIENTS; j++)
             {
                 if (socket == clients[j].sockfd)
                 {
@@ -86,6 +88,7 @@ int main(int argc, char const *argv[])
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
         clients[i].sockfd = -1;
+        clients[i].name = NULL;
     }
 
     if (argc < 2)
