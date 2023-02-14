@@ -18,6 +18,11 @@ void *connection_handle(void *client_socket)
     int read_len;
     do {
         read_len = recv(socket, buffer, BUFFER_SIZE, 0);
+        if (read_len == 0)
+        {
+            printf("Client disconnected\n");
+            break;
+        }
         // end of string marker
         buffer[read_len] = '\0';
         if (strcmp(buffer, "exit") == 0)

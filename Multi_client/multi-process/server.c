@@ -99,6 +99,15 @@ void handle_client(int client_socket)
     do
     {
         read_len = recv(client_socket, buffer, BUFFER_SIZE, 0);
+        if (read_len < 0)
+        {
+            perror("Receive failed");
+            exit(EXIT_FAILURE);
+        } else if (read_len == 0)
+        {
+            printf("Client disconnected\n");
+            break;
+        }
         // end of string marker
         buffer[read_len] = '\0';
         if (strcmp(buffer, "exit") == 0)

@@ -67,12 +67,12 @@ int main(int argc, char const *argv[])
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     pthread_t threads[1000];
 
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 100; i++)
     {
         pthread_create(&threads[i], NULL, create_connection, NULL);
     }
-    
-    for (int i = 0; i < 10; i++)
+
+    for (int i = 0; i < 100; i++)
     {
         pthread_join(threads[i], NULL);
     }
