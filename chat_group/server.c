@@ -59,7 +59,7 @@ void *connection_handle(void *client_sockfd)
             {
                 if (clients[i].sockfd != socket && clients[i].sockfd > 0 && clients[i].name != NULL)
                 {
-                    send(clients[i].sockfd, buffer, BUFFER_SIZE, 0);
+                    send(clients[i].sockfd, buffer, strlen(buffer), 0);
                 }
             }
         }

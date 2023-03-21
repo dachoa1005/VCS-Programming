@@ -22,7 +22,7 @@ void *send_message(void *client_sockfd)
         if (strcmp(message, "") != 0)
             break;
     }
-    if (send(socket, message, 1024, 0) < 0)
+    if (send(socket, message, strlen(message), 0) < 0)
     {
         perror("send");
         exit(1);
@@ -35,7 +35,7 @@ void *send_message(void *client_sockfd)
         message[strlen(message) - 1] = '\0';
         if (strcmp(message, "") != 0)
         {
-            if (send(socket, message, 1024, 0) < 0)
+            if (send(socket, message, strlen(message), 0) < 0)
             {
                 perror("send");
                 exit(1);
